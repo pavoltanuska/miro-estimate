@@ -12,7 +12,7 @@ const Config = {
         width: 300,
         height: 250
     },
-    team_api: 'https://slime-kilogram.glitch.me/team',
+    team_api: 'https://miro-estimate.glitch.me/team',
     supported_widgets: {
         text: 'plainText',
         image: 'title',
