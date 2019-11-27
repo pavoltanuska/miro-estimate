@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script type="text/javascript" src="https://miro.com/app/static/sdk.1.1.js"></script>
+    <script type="text/javascript" src="config.js"></script>
+    <script type="text/javascript">
+
+        miro.onReady(() => {
+            miro.initialize({
+                extensionPoints: {
+                    bottomBar: async () => {
+                        return {
+                            title: 'Estimate',
+                            svgIcon: Config.icon,
+                            onClick: async () => {
+                                await handleAuthAndOpenWindow(openEstimateSidebar);
+                            },
+                        }
+                    },
+                    getWidgetMenuItems: (widgets) => {
+
+                        if (Config.supported_widgets[widgets[0].type.toLowerCase()] !== undefined) {
+                            return Promise.resolve([{
+                                tooltip: 'Estimate',
+                                svgIcon: Config.icon,
+                                onClick: async (widgets) => {
+                                    await handleAuthAndOpenWindow(openEstimateModal, widgets);
+                                }
+                            }])
+                        }
+                    }
+                }
+            });
+        });
+
+        /**
+         * Modal opener
+         */
+        async function openEstimateModal(widget) {
+            return miro.board.ui.openModal('modal.html', Config.modal_options);
+        }
+
+        /**
+         * Sidebar opener
+         */
+        async function openEstimateSidebar() {
+            return miro.board.ui.openLeftSidebar('sidebar.html');
+        }
+
+        /**
+         * Unified function that handles implicit auth flow and opens appropriate window afterwards
+         *
+         * @param opener
+         * @param attribute
+         * @returns {Promise<void>}
+         */
+        async function handleAuthAndOpenWindow(opener, attribute) {
+            if (await miro.isAuthorized()) {
+                await opener(attribute);
+            } else {
+                miro.board.ui.openModal('auth/not-authorized.html')
+                    .then(async response => {
+                        if (response === 'success') {
+                            await opener(attribute);
+                        }
+                    })
+            }
+        }
+    </script>
+</head>
+</html>

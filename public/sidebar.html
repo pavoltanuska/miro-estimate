@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="https://miro.com/app/static/styles.1.0.css"/>
+    <link rel="stylesheet" type="text/css" href="styles.css"/>
+    <script type="text/javascript" src="https://miro.com/app/static/sdk.1.1.js"></script>
+    <script type="text/javascript" src="config.js"></script>
+</head>
+<body>
+<div class="sidebar-container">
+    <div class="sidebar-content">
+        <div class="sidebar-title">
+            <h1 class="miro-h1">
+                Estimate
+            </h1>
+            <div class="main-icon">
+                <svg viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                    <g id="icon-24" stroke="currentColor" stroke-width="2" fill="none" fill-rule="evenodd">
+                        <path d="M12 12 L 12 4 M12 12 L 18 12"/>
+                        <circle cx="12" cy="12" r="10"/>
+                        <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <h3 class="miro-h3">Selection</h3>
+        <div class="sidebar-section">
+
+            <div class="overview-table">
+                <div class="overview-column overview-column-selected">
+                    <div class="js-total-selected number-large"></div>
+                    <div class="overview-note">
+                        selected items
+                    </div>
+                </div>
+                <div class="overview-column overview-column-estimated">
+                    <div class="js-total-estimated number-large"></div>
+                    <div class="overview-note">
+                        with estimate
+                    </div>
+                </div>
+                <div class="overview-column overview-column-avg">
+                    <div class="js-avg-selected number-large"></div>
+                    <div class="overview-note">
+                        average per widget
+                    </div>
+                </div>
+                <div class="overview-column overview-column-sum">
+                    <div class="overview-column-icon">
+                        &sum;
+                    </div>
+                    <div class="js-sum-selected number-large"></div>
+                    <div class="overview-note">
+                        sum of estimates
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="miro-h3">User Stats</h3>
+        <div class="sidebar-section">
+            <table class="js-stats-table stats-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Sum</th>
+                        <th>Cards</th>
+                        <th>Avg</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+    </div>
+    <div class="sidebar-footer">
+        <h3 class="miro-h3">Tools</h3>
+        <div class="sidebar-section">
+            <div class="miro-input-group miro-input-group--small full-width">
+                <select class="miro-select miro-select--secondary-bordered full-width js-select-options">
+                    <option value="with_estimates">all with estimates</option>
+                    <option value="without_estimates">all without estimates</option>
+                    <option value="my_estimates">my estimates</option>
+                </select>
+                <button class="miro-btn miro-btn--primary js-select">
+                    Select
+                </button>
+            </div>
+
+            <div class="sidebar-export-buttons">
+                <button class="miro-btn miro-btn--secondary miro-btn--small js-export sidebar-export-button"
+                        value="csv">
+                    <img src="assets/csv.svg" /> Export to CSV
+                </button>
+                <button class="miro-btn miro-btn--secondary miro-btn--small js-export sidebar-export-button"
+                        value="xls">
+                    <img src="assets/xls.svg" /> Export to XLS
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+
+    // Let's catch all references to elements in the view
+    let totalSelectedElements = document.querySelectorAll('.js-total-selected');
+    let totalEstimatedElements = document.querySelectorAll('.js-total-estimated');
+    let sumSelectedElements = document.querySelectorAll('.js-sum-selected');
+    let avgSelectedElements = document.querySelectorAll('.js-avg-selected');
+    let statsTable = document.querySelector('.js-stats-table tbody');
+    let selectButton = document.querySelector('.js-select');
+    let selectOptions = document.querySelector('.js-select-options');
+    let exportButtons = document.querySelectorAll('.js-export');
+
+    // Global variables, so we can cache the results
+    let allEstimates = {};
+    let teamMembers = {};
+
+    // Fire off the functionality when miro is ready
+    miro.onReady(async () => {
+        registerListeners();
+        await reloadEverything();
+    });
+
+    /**
+     * Registers listeners for miro events, as well as clicks etc.
+     */
+    function registerListeners() {
+        miro.addListener('DATA_BROADCASTED', async function(event) {
+            if (event.data.estimatesUpdated !== undefined && event.data.estimatesUpdated == 'estimatesUpdated') {
+                await reloadEverything();
+            }
+        });
+
+        miro.addListener('WIDGETS_DELETED', async function(event) {
+            await reloadEverything();
+        });
+
+        miro.addListener('WIDGETS_CREATED', async function(event) {
+            await reloadEverything();
+        });
+
+        miro.addListener('CANVAS_CLICKED', async function(event) {
+            await reloadEverything();
+        });
+
+        miro.addListener('SELECTION_UPDATED', async function(event) {
+            await reloadEverything();
+        });
+
+        selectButton.addEventListener('click', selectWidgets);
+
+        exportButtons.forEach(element => {
+            element.addEventListener('click', exportData);
+        });
+    }
+
+
+    /**
+     * We are catching many events, debouncing is the wisest way to go
+     */
+    async function reloadEverything() {
+        reloadDebounced();
+    }
+
+    const reloadDebounced = debounce(reloadEstimatesAndWriteOutput, 50);
+
+    async function reloadEstimatesAndWriteOutput() {
+        await processEstimates();
+        await writeOutput(allEstimates);
+    }
+
+    /**
+     * Integers should stay integers, floats should be rounded to 2 decimal places
+     *
+     * @param number
+     * @returns {string|number}
+     */
+    function roundWithPrecision(number) {
+        if (number - Math.round(number) != 0) {
+            return parseFloat(number).toFixed(1);
+        }
+        return Math.round(number);
+    }
+
+    /**
+     * Converts widgets' metadata into internally structured estimate object
+     *
+     * @returns {Promise<void>}
+     */
+    async function processEstimates() {
+
+        let estimated = await fetchEstimatedWidgets();
+
+        allEstimates = estimated.map((widget) => {
+
+            let textField = Config.supported_widgets[widget.type.toLowerCase()];
+
+            return {
+                'id': widget.id,
+                'estimates': widget.metadata[Config.app_id],
+                'sum': Object.values(widget.metadata[Config.app_id]).reduce((accumulator, item) => accumulator + item, 0),
+                'plaintext': widget[textField] === undefined ? '' : widget[textField],
+            }
+        });
+
+        return allEstimates;
+    }
+
+    /**
+     * Fetches all items that have some estimate stored
+     */
+    async function fetchEstimatedWidgets() {
+
+        return (await miro.board.widgets.get())
+            .filter(item => item.metadata[Config.app_id] !== undefined);
+    }
+
+    /**
+     * Requests all team-user connections
+     */
+    async function fetchTeamMembers() {
+
+        return fetch(Config.team_api, {
+            headers: {
+                'X-Token': await miro.getToken(),
+                'X-Account': (await miro.account.get()).id
+            }
+        })
+            .then(response => response.json());
+    }
+
+    /**
+     * Selects specified group of widgets.
+     * Uses a little bit of array magic, so the comments are more thorough
+     *
+     * @returns {Promise<void>}
+     */
+    async function selectWidgets() {
+
+        let ids = [];
+
+        // Figure out the chosen option for select
+        switch(selectOptions.options[selectOptions.selectedIndex].value) {
+
+            case 'with_estimates':
+                // Just take all the estimate items' ids
+                ids = allEstimates.map(item => item.id);
+                break;
+
+            case 'without_estimates':
+                // We need to make diff between estimated and all widgets
+                // Let's remember ids of estimated ones...
+                let estimatedIds = allEstimates.map((item) => item.id);
+
+                // ...then take all widgets...
+                ids = (await miro.board.widgets.get())
+                    // ...remove the ones that have any estimate...
+                    .filter(widget => !estimatedIds.includes(widget.id))
+                    // ...and take ids of the rest
+                    .map(widget => widget.id);
+                break;
+
+            case 'my_estimates':
+                let userId = await miro.currentUser.getId();
+                // Filter out the items, that don't have estimate from current user
+                ids = allEstimates
+                    .filter(item => item.estimates[userId] !== undefined)
+                    .map(item => item.id);
+                break;
+        }
+
+        await miro.board.selection.selectWidgets(ids);
+    }
+
+    /**
+     * Calculates the numbers and writes them into the tables
+     *
+     * @param estimates
+     * @returns {Promise<void>}
+     */
+    async function writeOutput(estimates) {
+
+        let selectedWidgets = await miro.board.selection.get();
+
+        if (selectedWidgets.length > 0) {
+            let onlyIds = selectedWidgets.map(item => item.id);
+            estimates = estimates.filter(item => onlyIds.includes(item.id));
+        }
+
+        await writeToOverviewTable(estimates, selectedWidgets);
+        await writeStatsToTable(estimates);
+    }
+
+    /**
+     * (Re)populates the overview table with current values
+     */
+    async function writeToOverviewTable(estimates, selected) {
+
+        // Calculate sum of all estimates
+        let estimatesSum = estimates.reduce((accumulator, item) => accumulator + item.sum, 0);
+
+        // Calculate average estimate per widget
+        let estimatesAvg = estimates.length > 0 ? estimatesSum / estimates.length : 0;
+
+        // Write total estimates
+        totalEstimatedElements.forEach(element => {
+            element.innerHTML = estimates.length.toString();
+        })
+
+        // Write selection count
+        totalSelectedElements.forEach(element => {
+            if (selected.length == 0) {
+                element.innerHTML = 'all';
+            } else {
+                element.innerHTML = selected.length.toString();
+            }
+        })
+
+        // Write sum
+        sumSelectedElements.forEach(element => {
+            element.innerHTML = roundWithPrecision(estimatesSum).toString();
+        })
+
+        // Write average
+        avgSelectedElements.forEach(element => {
+            element.innerHTML = roundWithPrecision(estimatesAvg).toString();
+        })
+    }
+
+    /**
+     * Small helper function for creating loading spinner
+     */
+    function createSpinner() {
+
+        let loadingRow = statsTable.insertRow(0);
+        let cell = loadingRow.insertCell();
+        cell.setAttribute('colspan', '4');
+        cell.innerHTML = Config.spinner_element;
+
+        return loadingRow;
+    }
+
+    /**
+     * (Re)populates the numbers into users table
+     *
+     * @param estimates
+     * @returns {Promise<void>}
+     */
+    async function writeStatsToTable(estimates) {
+
+        // This means we don't have the team members cached yet, let's download them
+        if (teamMembers.length === undefined) {
+
+            // It could take a while, we need to show the user we're working on it
+            let spinner = createSpinner();
+
+            teamMembers = await fetchTeamMembers();
+
+            // Members fetched, remove the spinner
+            spinner.remove();
+        }
+
+        teamMembers.forEach(function(connection) {
+
+            // So we don't have to access the connection all the time
+            let user = connection.user;
+
+            // Try to find user row
+            let row = statsTable.querySelector('.user-id-' + user.id);
+
+            // We don't have any yet, let's create a new one
+            if (row == null) {
+                row = statsTable.insertRow(0);
+                row.classList.add('user-id-' + user.id);
+            }
+
+            // Prepare cell references
+            let cells = {};
+
+            // Prepare table cells to write in
+            ['name', 'sum', 'widgets', 'avg'].forEach(function(cellName) {
+
+                // Does the cell exist? If not, create it
+                let cell = row.querySelector('.cell-' + cellName);
+                if (cell == null) {
+                    cell = row.insertCell();
+                    cell.classList.add('cell-' + cellName);
+                }
+
+                cells[cellName] = cell;
+            });
+
+            // We want to insert the name only if there isn't one yet
+            // (otherwise it blinks)
+            if (cells['name'].innerHTML === '') {
+                let nameAndPicture = '<img class="stats-user-picture" src="' + user.picture.imageUrl + '"/> ' + user.name;
+                cells['name'].innerHTML = nameAndPicture;
+            }
+
+            // Calculate and write sum for user
+            let sum = estimates.reduce((accumulator, item) => {
+                    return accumulator + (item.estimates[user.id] === undefined ? 0 : item.estimates[user.id])
+                }, 0);
+            cells['sum'].innerHTML = sum;
+
+            // Count the widgets user has estimated
+            let count = estimates.filter(item => item.estimates[user.id] !== undefined).length;
+            cells['widgets'].innerHTML = count;
+
+            // Write average
+            cells['avg'].innerHTML = count > 0 ? roundWithPrecision(sum / count).toString() : 0;
+        });
+    }
+
+    /**
+     * Create ad-hoc CSV content
+     */
+    function createCsvContent() {
+        let content = "data:text/csv;charset=utf-8,";
+
+        allEstimates.forEach(function(item) {
+            content += `'${item.id}','${item.plaintext}','${item.sum}'` + "\r\n";
+        });
+
+        return encodeURI(content);
+    }
+
+    /**
+     * Create ad-hoc XLS content.
+     *
+     * Here's an example of functionality where external library could be more useful.
+     * But we don't want to use any.
+     */
+    function createXlsContent() {
+
+        let content = 'data:application/vnd.ms-excel;base64,';
+        let innerContent = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">'
+            + '<head>'
+            + '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{Estimates}</x:Name>'
+            + '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>'
+            + '</xml><![endif]-->'
+            + '<meta http-equiv="content-type" content="text/plain; charset=UTF-8"/>'
+            + '</head><body><table>';
+
+        innerContent += '<tr><td>Widget ID</td><td>Title</td><td>Sum</td></tr>';
+
+        allEstimates.forEach(function(item) {
+            innerContent += `<tr><td>'${item.id}</td><td>${item.plaintext}</td><td>${item.sum}</td></tr>`;
+        });
+
+        innerContent += '</table></body></html>';
+
+        return content + window.btoa(unescape(encodeURIComponent(innerContent)));
+    }
+
+    /**
+     * Exports estimates file in user selected format
+     *
+     * @param event
+     * @returns {Promise<void>}
+     */
+    async function exportData(event) {
+
+        let format = event.target.value;
+        let filename = (await miro.board.info.get()).title + '.' + format;
+
+        let fileContent = '';
+
+        switch(format) {
+            case 'csv':
+                fileContent = createCsvContent();
+                break;
+            case 'xls':
+                fileContent = createXlsContent();
+                break;
+        }
+
+        let link = document.createElement("a");
+        link.setAttribute("href", fileContent);
+        link.setAttribute("download", filename);
+
+        document.body.appendChild(link);
+        link.click();
+    }
+
+    /**
+     * Debounce function from internets
+     * https://stackoverflow.com/questions/24004791/can-someone-explain-the-debounce-function-in-javascript
+     *
+     * (Who would write his own debounce in 2019, right?)
+     */
+    function debounce(func, wait, immediate) {
+        let timeout;
+        return function() {
+            let context = this;
+            let args = arguments;
+            let callNow = immediate && !timeout;
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                timeout = null;
+                if (!immediate) {
+                    func.apply(context, args);
+                }
+            }, wait);
+            if (callNow) func.apply(context, args);
+        }
+    }
+
+</script>
+</body>
+</html>

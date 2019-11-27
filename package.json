@@ -1,0 +1,27 @@
+{
+    "name": "miro-estimate",
+    "version": "0.0.1",
+    "description": "Estimates management plugin for widgets on Miro.com boards",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "express": "^4.16.4",
+        "node-fetch": "^2.6.0"
+    },
+    "engines": {
+        "node": "8.x"
+    },
+    "repository": {
+        "url": "https://github.com:pavoltanuska/miro-estimate.git"
+    },
+    "license": "MIT",
+    "keywords": [
+        "estimate",
+        "miro.com",
+        "miro",
+        "widget",
+        "board"
+    ]
+}
