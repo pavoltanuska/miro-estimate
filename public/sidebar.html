@@ -119,9 +119,11 @@
     // Global variables, so we can cache the results
     let allEstimates = {};
     let teamMembers = {};
+    let socket;
 
     // Fire off the functionality when miro is ready
     miro.onReady(async () => {
+        await authenticateAndOpenWebsocketConnection();
         registerListeners();
         await reloadEverything();
     });
@@ -238,6 +240,33 @@
             }
         })
             .then(response => response.json());
+    }
+
+    async function authenticateAndOpenWebsocketConnection() {
+
+        return fetch(Config.auth_api, {
+            headers: {
+                'X-Token': await miro.getToken(),
+                'X-Board-Id': (await miro.board.info.get()).id
+            },
+            method: "POST",
+            credentials: "include",
+        })
+            .then(response => response.json())
+            .then(json => {
+                if (json.result == "OK") {
+                    socket = new WebSocket(Config.websocket);
+                    if (socket.readyState === WebSocket.OPEN) {
+                        return true;
+                    }
+                }
+            });
+    }
+
+    function sendMessageToWebsocket(message) {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(message);
+        }
     }
 
     /**
