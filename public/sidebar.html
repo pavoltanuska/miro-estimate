@@ -133,6 +133,7 @@
         miro.addListener('DATA_BROADCASTED', async function(event) {
             if (event.data.estimatesUpdated !== undefined && event.data.estimatesUpdated == 'estimatesUpdated') {
                 await reloadEverything();
+                sendMessageToWebsocket("data_changed");
             }
         });
 
@@ -145,11 +146,11 @@
         });
 
         miro.addListener('CANVAS_CLICKED', async function(event) {
-            await reloadEverything();
+            await writeOutput(allEstimates);
         });
 
         miro.addListener('SELECTION_UPDATED', async function(event) {
-            await reloadEverything();
+            await writeOutput(allEstimates);
         });
 
         selectButton.addEventListener('click', selectWidgets);
@@ -157,8 +158,13 @@
         exportButtons.forEach(element => {
             element.addEventListener('click', exportData);
         });
-    }
 
+        socket.onmessage = async function(message) {
+            if (message.data == "data_changed") {
+                await reloadEverything();
+            }
+        }
+    }
 
     /**
      * We are catching many events, debouncing is the wisest way to go
@@ -404,8 +410,8 @@
 
             // Calculate and write sum for user
             let sum = estimates.reduce((accumulator, item) => {
-                    return accumulator + (item.estimates[user.id] === undefined ? 0 : item.estimates[user.id])
-                }, 0);
+                return accumulator + (item.estimates[user.id] === undefined ? 0 : item.estimates[user.id])
+            }, 0);
             cells['sum'].innerHTML = sum;
 
             // Count the widgets user has estimated

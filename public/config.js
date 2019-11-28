@@ -13,6 +13,8 @@ const Config = {
         height: 250
     },
     team_api: 'https://miro-estimate.glitch.me/team',
+    auth_api: 'https://miro-estimate.glitch.me/auth',
+    websocket: 'wss://miro-estimate.glitch.me/',
     supported_widgets: {
         text: 'plainText',
         image: 'title',
