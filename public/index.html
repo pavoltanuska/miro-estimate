@@ -20,7 +20,8 @@
                     },
                     getWidgetMenuItems: (widgets) => {
 
-                        if (Config.supported_widgets[widgets[0].type.toLowerCase()] !== undefined) {
+                        // @TODO: implement support for multiple widgets
+                        if (widgets.length == 1 && Config.supported_widgets[widgets[0].type.toLowerCase()] !== undefined) {
                             return Promise.resolve([{
                                 tooltip: 'Estimate',
                                 svgIcon: Config.icon,
