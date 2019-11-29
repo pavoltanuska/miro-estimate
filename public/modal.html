@@ -45,7 +45,7 @@
 
         // Cache these values, they won't change during the runtime
         modalInfo = {
-            widget: (await miro.board.selection.get())[0],
+            widgets: await miro.board.selection.get(),
             userId: await miro.currentUser.getId()
         };
 
@@ -128,20 +128,39 @@
 
     /**
      * Tries to retrieve existing estimate for current user
+     * In case of multiple selected widgets, all of them need to have the same estimate value
      */
     async function retrieveEstimate() {
 
-        // Did our app already store any estimates to this widget?
-        if (modalInfo.widget.metadata[Config.app_id] === undefined) {
-            return null;
-        }
+        let commonEstimate = null;
 
-        // Did we store any estimate for current user?
-        if (modalInfo.widget.metadata[Config.app_id][modalInfo.userId] === undefined) {
-            return null;
-        }
+        modalInfo.widgets.forEach((widget) => {
+            // Did our app already store any estimates to this widget?
+            if (widget.metadata[Config.app_id] === undefined) {
+                commonEstimate = null;
+                return;
+            }
 
-        return modalInfo.widget.metadata[Config.app_id][modalInfo.userId];
+            // Did we store any estimate for current user?
+            if (widget.metadata[Config.app_id][modalInfo.userId] === undefined) {
+                commonEstimate = null;
+                return;
+            }
+
+            let currentEstimate = widget.metadata[Config.app_id][modalInfo.userId];
+
+            // If the commonEstimate is not set (checking first item)
+            // or commonEstimate is the same as currentEstimate
+            // we can continue, since up until now, all widgets share the same estimate value
+            if (commonEstimate === undefined || commonEstimate == currentEstimate) {
+                commonEstimate = currentEstimate;
+            } else {
+                commonEstimate = null;
+                return;
+            }
+        });
+
+        return commonEstimate;
     }
 
     /**
@@ -152,36 +171,45 @@
      */
     async function updateMetadata(estimate) {
 
-        // Get the current metadata
-        let metadata = modalInfo.widget.metadata;
+        // We'll prepare the widgets we want to update first
+        let widgetsToUpdate = [];
 
-        // Are we clearing or storing?
-        if (estimate === null) {
+        modalInfo.widgets.forEach((widget) => {
+            // Get the current metadata
+            let metadata = widget.metadata;
 
-            // Null means we're clearing
-            delete metadata[Config.app_id][modalInfo.userId];
-        } else {
+            // Are we clearing or storing?
+            if (estimate === null) {
 
-            // We want just numbers
-            if (!isNumeric(estimate)) {
-                throw "NaN";
-            }
-
-            // If our app didn't write any estimate for this widget before, we
-            // need to create the whole structure anew
-            if (metadata[Config.app_id] === undefined) {
-                metadata = {[Config.app_id]: {[modalInfo.userId] : parseFloat(estimate)}};
+                // Null means we're clearing
+                delete metadata[Config.app_id][modalInfo.userId];
             } else {
-                // We already have the structure ready, let's just write new value
-                metadata[Config.app_id][modalInfo.userId] = parseFloat(estimate);
-            }
-        }
 
-        // Store new metadata...
-        await miro.board.widgets.update([{
-            id: modalInfo.widget.id,
-            metadata: metadata,
-        }]);
+                // We want just numbers
+                if (!isNumeric(estimate)) {
+                    throw "NaN";
+                }
+
+                // If our app didn't write any estimate for this widget before, we
+                // need to create the whole structure anew
+                if (metadata[Config.app_id] === undefined) {
+                    metadata = {[Config.app_id]: {[modalInfo.userId] : parseFloat(estimate)}};
+                } else {
+                    // We already have the structure ready, let's just write new value
+                    metadata[Config.app_id][modalInfo.userId] = parseFloat(estimate);
+                }
+            }
+
+            widgetsToUpdate.push({
+                id: widget.id,
+                metadata: metadata
+            });
+        });
+
+        // Store new metadata in bulk
+        if (widgetsToUpdate.length > 0) {
+            await miro.board.widgets.update(widgetsToUpdate);
+        }
     }
 
     /**

@@ -210,7 +210,19 @@
     async function fetchEstimatedWidgets() {
 
         return (await miro.board.widgets.get())
-            .filter(item => item.metadata[Config.app_id] !== undefined);
+            .filter(item => {
+                // Widget is "not estimated" if we didn't store any estimate in it
+                if (item.metadata[Config.app_id] === undefined) {
+                    return false;
+                }
+
+                // The same applies when there's no user estimation stored
+                if (Object.keys(item.metadata[Config.app_id]).length < 1) {
+                    return false;
+                }
+
+                return true;
+            });
     }
 
     /**

@@ -20,8 +20,11 @@
                     },
                     getWidgetMenuItems: (widgets) => {
 
-                        // @TODO: implement support for multiple widgets
-                        if (widgets.length == 1 && Config.supported_widgets[widgets[0].type.toLowerCase()] !== undefined) {
+                        const supportedWidgetsInSelection = widgets
+                            .filter((widget) => Config.supported_widgets[widget.type.toLowerCase()] !== undefined);
+
+                        // All selected widgets have to be supported in order to show the menu
+                        if (supportedWidgetsInSelection.length == widgets.length) {
                             return Promise.resolve([{
                                 tooltip: 'Estimate',
                                 svgIcon: Config.icon,
@@ -30,6 +33,9 @@
                                 }
                             }])
                         }
+
+                        // Not all selected widgets are supported, we won't show the menu
+                        return Promise.resolve([{}]);
                     }
                 }
             });
