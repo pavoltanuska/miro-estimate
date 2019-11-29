@@ -18,7 +18,7 @@
             </svg>
             </div>
 
-            <h2 style="margin: 30px 0;">Please, authorize Estimates to collaborate with your team</h2>
+            <h2 style="margin: 30px 0;">Please, authorize Estimate to collaborate with your team</h2>
             <button class="miro-btn miro-btn--primary">Authorize</button>
         </div>
     </div>
@@ -26,7 +26,7 @@
     document.querySelector('button').addEventListener('click', function () {
         const authorizeOptions = {
             response_type: 'token',
-            redirect_uri: 'https://' + window.location.host + '/miro/numeric-estimates/auth/success.html'
+            redirect_uri: 'https://' + window.location.host + '/auth/success.html'
         }
         miro.authorize(authorizeOptions)
             .then(() => miro.getToken())
