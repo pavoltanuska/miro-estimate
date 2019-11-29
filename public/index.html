@@ -3,9 +3,10 @@
 <head>
     <script type="text/javascript" src="https://miro.com/app/static/sdk.1.1.js"></script>
     <script type="text/javascript" src="config.js"></script>
+    <script type="text/javascript" src="websockets.js"></script>
     <script type="text/javascript">
 
-        miro.onReady(() => {
+        miro.onReady(async () => {
             miro.initialize({
                 extensionPoints: {
                     bottomBar: async () => {
@@ -31,13 +32,27 @@
                     }
                 }
             });
+
+            await authenticateAndOpenWebsocketConnection();
+
+            miro.addListener('WIDGETS_DELETED', async function(event) {
+                await sendMessageToWebsocket("data_changed");
+            });
+
+            miro.addListener('WIDGETS_CREATED', async function(event) {
+                await sendMessageToWebsocket("data_changed");
+            });
         });
 
         /**
          * Modal opener
          */
         async function openEstimateModal(widget) {
-            return miro.board.ui.openModal('modal.html', Config.modal_options);
+            return miro.board.ui.openModal('modal.html', Config.modal_options)
+                .then(() => {
+                    // Inform others, that the data has changed
+                    sendMessageToWebsocket("data_changed")
+                });
         }
 
         /**

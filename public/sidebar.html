@@ -7,6 +7,7 @@
     <link rel="stylesheet" type="text/css" href="styles.css"/>
     <script type="text/javascript" src="https://miro.com/app/static/sdk.1.1.js"></script>
     <script type="text/javascript" src="config.js"></script>
+    <script type="text/javascript" src="websockets.js"></script>
 </head>
 <body>
 <div class="sidebar-container">
@@ -119,7 +120,6 @@
     // Global variables, so we can cache the results
     let allEstimates = {};
     let teamMembers = {};
-    let socket;
 
     // Fire off the functionality when miro is ready
     miro.onReady(async () => {
@@ -132,21 +132,6 @@
      * Registers listeners for miro events, as well as clicks etc.
      */
     function registerListeners() {
-        miro.addListener('DATA_BROADCASTED', async function(event) {
-            if (event.data.estimatesUpdated !== undefined && event.data.estimatesUpdated == 'estimatesUpdated') {
-                await reloadEverything();
-                sendMessageToWebsocket("data_changed");
-            }
-        });
-
-        miro.addListener('WIDGETS_DELETED', async function(event) {
-            await reloadEverything();
-        });
-
-        miro.addListener('WIDGETS_CREATED', async function(event) {
-            await reloadEverything();
-        });
-
         miro.addListener('CANVAS_CLICKED', async function(event) {
             await writeOutput(allEstimates);
         });
@@ -242,32 +227,6 @@
             .then(response => response.json());
     }
 
-    async function authenticateAndOpenWebsocketConnection() {
-
-        return fetch(Config.auth_api, {
-            headers: {
-                'X-Token': await miro.getToken(),
-                'X-Board-Id': (await miro.board.info.get()).id
-            },
-            method: "POST",
-            credentials: "include",
-        })
-            .then(response => response.json())
-            .then(json => {
-                if (json.result == "OK") {
-                    socket = new WebSocket(Config.websocket);
-                    if (socket.readyState === WebSocket.OPEN) {
-                        return true;
-                    }
-                }
-            });
-    }
-
-    function sendMessageToWebsocket(message) {
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.send(message);
-        }
-    }
 
     /**
      * Selects specified group of widgets.
