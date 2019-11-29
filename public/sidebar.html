@@ -331,6 +331,11 @@
      */
     function createSpinner() {
 
+        // Spinner may already be loaded (async yay)
+        if (statsTable.querySelector('.loader-ring') !== null) {
+            return false;
+        }
+
         let loadingRow = statsTable.insertRow(0);
         let cell = loadingRow.insertCell();
         cell.setAttribute('colspan', '4');
@@ -356,7 +361,9 @@
             teamMembers = await fetchTeamMembers();
 
             // Members fetched, remove the spinner
-            spinner.remove();
+            if (spinner !== false) {
+                spinner.remove();
+            }
         }
 
         teamMembers.forEach(function(connection) {
