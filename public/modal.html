@@ -152,7 +152,7 @@
             // If the commonEstimate is not set (checking first item)
             // or commonEstimate is the same as currentEstimate
             // we can continue, since up until now, all widgets share the same estimate value
-            if (commonEstimate === undefined || commonEstimate == currentEstimate) {
+            if (commonEstimate === null || commonEstimate == currentEstimate) {
                 commonEstimate = currentEstimate;
             } else {
                 commonEstimate = null;
