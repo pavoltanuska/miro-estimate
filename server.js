@@ -30,7 +30,7 @@ app.use(cors({
 // Parse the session using server side secret
 const sessionParser = session({
     saveUninitialized: false,
-    secret: 'realsecret_yes',
+    secret: process.env.SESSION_SECRET,
     resave: false
 });
 
