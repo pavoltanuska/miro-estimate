@@ -7,7 +7,6 @@
     <link rel="stylesheet" type="text/css" href="styles.css"/>
     <script type="text/javascript" src="https://miro.com/app/static/sdk.1.1.js"></script>
     <script type="text/javascript" src="config.js"></script>
-    <script type="text/javascript" src="websockets.js"></script>
 </head>
 <body>
 <div class="sidebar-container">
@@ -123,7 +122,6 @@
 
     // Fire off the functionality when miro is ready
     miro.onReady(async () => {
-        await authenticateAndOpenWebsocketConnection();
         registerListeners();
         await reloadEverything();
     });
@@ -140,17 +138,17 @@
             await writeOutput(allEstimates);
         });
 
+        miro.addListener('DATA_BROADCASTED', async function(event) {
+            if (event.data == "change_notification") {
+                await reloadEverything();
+            }
+        });
+
         selectButton.addEventListener('click', selectWidgets);
 
         exportButtons.forEach(element => {
             element.addEventListener('click', exportData);
         });
-
-        socket.onmessage = async function(message) {
-            if (message.data == "data_changed") {
-                await reloadEverything();
-            }
-        }
     }
 
     /**

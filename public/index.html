@@ -49,6 +49,12 @@
             miro.addListener('WIDGETS_CREATED', async function(event) {
                 await sendMessageToWebsocket("data_changed");
             });
+
+            socket.onmessage = async function(message) {
+                if (message.data == "data_changed") {
+                    await miro.broadcastData("change_notification");
+                }
+            };
         });
 
         /**

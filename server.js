@@ -149,8 +149,7 @@ wss.on('connection', function(ws, request) {
             // Notify:
             // - everybody listening for events on the same board
             // - that has WebSocket open
-            // - and is not the one that sent the message
-            if (clientInfo.boardId == boardId && clientInfo.client.readyState === WebSocket.OPEN && userId != storedUserId) {
+            if (clientInfo.boardId == boardId && clientInfo.client.readyState === WebSocket.OPEN) {
                 clientInfo.client.send(message);
             }
         });
