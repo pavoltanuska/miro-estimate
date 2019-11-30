@@ -1,4 +1,5 @@
 let socket;
+let socketOpenListener;
 
 async function authenticateAndOpenWebsocketConnection() {
     return fetch(Config.auth_api, {
@@ -12,10 +13,30 @@ async function authenticateAndOpenWebsocketConnection() {
         .then(response => response.json())
         .then(json => {
             if (json.result == "OK") {
-                socket = new WebSocket(Config.websocket);
+                openSocket();
                 return true;
             }
         });
+}
+
+function openSocket() {
+    // Create new socket
+    socket = new WebSocket(Config.websocket);
+
+    // We can (and do) have an external open listener
+    // e.g. broadcast forwarder
+    socket.onopen = function() {
+        if (socketOpenListener !== undefined) {
+            socketOpenListener();
+        }
+    }
+
+    socket.onclose = function(){
+        // Try to reconnect in 5 seconds
+        setTimeout(() => {
+            authenticateAndOpenWebsocketConnection()
+        }, 5000);
+    };
 }
 
 async function sendMessageToWebsocket (message) {

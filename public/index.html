@@ -40,6 +40,14 @@
                 }
             });
 
+            socketOpenListener = function() {
+                socket.onmessage = async function(message) {
+                    if (message.data == "data_changed") {
+                        await miro.broadcastData("change_notification");
+                    }
+                }
+            };
+
             await authenticateAndOpenWebsocketConnection();
 
             miro.addListener('WIDGETS_DELETED', async function(event) {
@@ -49,12 +57,6 @@
             miro.addListener('WIDGETS_CREATED', async function(event) {
                 await sendMessageToWebsocket("data_changed");
             });
-
-            socket.onmessage = async function(message) {
-                if (message.data == "data_changed") {
-                    await miro.broadcastData("change_notification");
-                }
-            };
         });
 
         /**
