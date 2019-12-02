@@ -409,7 +409,11 @@
             // We want to insert the name only if there isn't one yet
             // (otherwise it blinks)
             if (cells['name'].innerHTML === '') {
-                let nameAndPicture = '<img class="stats-user-picture" src="' + user.picture.imageUrl + '"/> ' + user.name;
+                let nameAndPicture = '';
+                if (user.picture != null) {
+                    nameAndPicture = '<img class="stats-user-picture" src="' + user.picture.imageUrl + '"/> ';
+                }
+                nameAndPicture += user.name;
                 cells['name'].innerHTML = nameAndPicture;
             }
 
